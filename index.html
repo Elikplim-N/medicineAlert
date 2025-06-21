@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Doctor Dashboard – Med Reminder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="text-gray-800 min-h-screen flex items-center justify-center" 
+    style="background-image: url('https://img.freepik.com/free-photo/african-american-therapist-doctor-discussing-with-sick-patient_482257-22703.jpg?semt=ais_hybrid&w=740'); background-size: auto; background-position: cover;">
+    
+    <div class="w-full max-w-md p-6 bg-white shadow-lg rounded-xl mt-10 mb-10">
+        <h1 class="text-2xl font-bold text-center mb-4">🩺 Doctor Dashboard</h1>
+
+        <form id="medForm" class="space-y-4">
+            <div>
+                <label class="block font-medium">Patient RFID UID</label>
+                <input type="text" name="uid" required class="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring" placeholder="e.g. A1B2C3D4" />
+            </div>
+            <div>
+                <label class="block font-medium">Medicine Name</label>
+                <input type="text" name="medicine" required class="w-full border px-3 py-2 rounded-md" />
+            </div>
+            <div>
+                <label class="block font-medium">Dosage</label>
+                <input type="text" name="dosage" required class="w-full border px-3 py-2 rounded-md" />
+            </div>
+            <div>
+                <label class="block font-medium">Set Times per Day</label>
+                <div id="timeSlots" class="space-y-2">
+                    <div class="flex gap-2">
+                        <input type="number" name="hour[]" min="0" max="23" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Hour" />
+                        <input type="number" name="minute[]" min="0" max="59" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Minute" />
+                    </div>
+                </div>
+                <button type="button" onclick="addTimeSlot()" class="text-blue-600 text-sm mt-1 hover:underline">+ Add another time</button>
+            </div>
+            <div>
+                <label class="block font-medium">Start Date</label>
+                <input type="date" name="start_date" required class="w-full border px-3 py-2 rounded-md" />
+            </div>
+            <div>
+                <label class="block font-medium">Repeat for (days)</label>
+                <input type="number" name="repeat_days" min="1" value="1" required class="w-full border px-3 py-2 rounded-md" />
+            </div>
+            <div>
+                <label class="block font-medium">Notes</label>
+                <textarea name="notes" rows="2" class="w-full border px-3 py-2 rounded-md"></textarea>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">Save Schedule</button>
+        </form>
+
+        <div id="result" class="mt-4 text-sm text-center text-green-600 hidden">
+            ✅ Schedule saved successfully!
+        </div>
+
+        <!-- View Prescriptions -->
+        <div class="mt-8 p-4 bg-gray-100 rounded-lg">
+            <h2 class="text-lg font-semibold mb-2">📋 View Patient's Prescriptions</h2>
+            <form id="viewForm" class="flex gap-2 items-center mb-4">
+                <input type="text" name="view_uid" placeholder="Enter Patient UID" required class="flex-1 border px-3 py-2 rounded-md" />
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">View</button>
+            </form>
+
+            <div id="prescriptions" class="space-y-3 text-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        function addTimeSlot() {
+            const container = document.getElementById('timeSlots');
+            const div = document.createElement('div');
+            div.className = 'flex gap-2';
+            div.innerHTML = `
+                <input type="number" name="hour[]" min="0" max="23" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Hour" />
+                <input type="number" name="minute[]" min="0" max="59" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Minute" />
+            `;
+            container.appendChild(div);
+        }
+
+        document.getElementById('medForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const uid = form.uid.value.trim();
+            const medicine = form.medicine.value.trim();
+            const dosage = form.dosage.value.trim();
+            const hours = [...form.querySelectorAll('input[name="hour[]"]')].map(input => parseInt(input.value));
+            const minutes = [...form.querySelectorAll('input[name="minute[]"]')].map(input => parseInt(input.value));
+            const start_date = form.start_date.value;
+            const repeat_days = parseInt(form.repeat_days.value);
+            const notes = form.notes.value.trim();
+
+            try {
+                const payloads = hours.map((hour, i) => ({
+                    patient_uid: uid,
+                    medicine_name: medicine,
+                    dosage: dosage,
+                    time_hour: hour,
+                    time_minute: minutes[i],
+                    start_date: start_date,
+                    repeat_days: repeat_days,
+                    notes: notes,
+                    taken: false
+                }));
+
+                const results = await Promise.all(payloads.map(payload =>
+                    fetch('https://lhyxuuomjusjmkycuwuh.supabase.co/rest/v1/medicine_schedules', {
+                        method: 'POST',
+                        headers: {
+                            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeXh1dW9tanVzam1reWN1d3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwODc0NjIsImV4cCI6MjA1NjY2MzQ2Mn0.d_Ax_9uf6_yrx6lpwFzptpyL3AfB_VPo-sXEgavje54',
+                            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeXh1dW9tanVzam1reWN1d3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwODc0NjIsImV4cCI6MjA1NjY2MzQ2Mn0.d_Ax_9uf6_yrx6lpwFzptpyL3AfB_VPo-sXEgavje54',
+                            'Content-Type': 'application/json',
+                            'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                ));
+
+                if (results.every(res => res.ok)) {
+                    document.getElementById('result').classList.remove('hidden');
+                    form.reset();
+                    document.getElementById('timeSlots').innerHTML = `
+                        <div class="flex gap-2">
+                            <input type="number" name="hour[]" min="0" max="23" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Hour" />
+                            <input type="number" name="minute[]" min="0" max="59" required class="w-1/2 border px-2 py-2 rounded-md" placeholder="Minute" />
+                        </div>`;
+                } else {
+                    alert('❌ Error saving one or more schedules.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('⚠️ Failed to connect.');
+            }
+        });
+
+        document.getElementById('viewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const uid = e.target.view_uid.value.trim();
+            const prescriptionsDiv = document.getElementById('prescriptions');
+            prescriptionsDiv.innerHTML = '⏳ Loading...';
+
+            try {
+                const res = await fetch(`https://lhyxuuomjusjmkycuwuh.supabase.co/rest/v1/medicine_schedules?patient_uid=eq.${uid}`, {
+                    headers: {
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeXh1dW9tanVzam1reWN1d3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwODc0NjIsImV4cCI6MjA1NjY2MzQ2Mn0.d_Ax_9uf6_yrx6lpwFzptpyL3AfB_VPo-sXEgavje54',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoeXh1dW9tanVzam1reWN1d3VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwODc0NjIsImV4cCI6MjA1NjY2MzQ2Mn0.d_Ax_9uf6_yrx6lpwFzptpyL3AfB_VPo-sXEgavje54',
+                    }
+                });
+
+                const data = await res.json();
+                if (!data.length) {
+                    prescriptionsDiv.innerHTML = '❌ No prescriptions found for this UID.';
+                    return;
+                }
+
+                prescriptionsDiv.innerHTML = data.map(item => `
+                    <div class="bg-white border rounded p-3 shadow-sm">
+                        <p><strong>🧾 Medicine:</strong> ${item.medicine_name}</p>
+                        <p><strong>💊 Dosage:</strong> ${item.dosage}</p>
+                        <p><strong>⏰ Time:</strong> ${String(item.time_hour).padStart(2, '0')}:${String(item.time_minute).padStart(2, '0')}</p>
+                        <p><strong>📅 From:</strong> ${item.start_date} for ${item.repeat_days} day(s)</p>
+                        ${item.notes ? `<p><strong>📝 Notes:</strong> ${item.notes}</p>` : ''}
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                console.error(err);
+                prescriptionsDiv.innerHTML = '⚠️ Failed to load prescriptions.';
+            }
+        });
+    </script>
+</body>
+</html>
